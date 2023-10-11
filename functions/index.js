@@ -1,9 +1,11 @@
 const express = require('express');
+const serverless = require('serverless-http');
 const bodyParser = require('body-parser');
-const fs = require('fs'); // Import the fs module for file operations
+const fs = require('fs');
 const app = express();
+const router = express.Router();
 
-app.use(bodyParser.json());
+let records = [];
 
 // Function to read data from the JSON file
 const readData = () => {
@@ -26,35 +28,43 @@ const writeData = (data) => {
 };
 
 // GET method to retrieve data
-app.get('/data', (req, res) => {
+router.get('/data', (req, res) => {
   const data = readData();
   res.json(data);
 });
 
 // POST method to add data
-app.post('/data', (req, res) => {
+router.post('/data', (req, res) => {
   const newItem = req.body;
   const data = readData();
   data.push(newItem);
-  writeData(data); // Write updated data to the JSON file
+  writeData(data);
   res.json({ message: 'Data added successfully' });
 });
 
 // DELETE method to remove data
-app.delete('/data/:index', (req, res) => {
+router.delete('/data/:index', (req, res) => {
   const index = parseInt(req.params.index);
   const data = readData();
   if (index >= 0 && index < data.length) {
     const deletedItem = data.splice(index, 1);
-    writeData(data); // Write updated data to the JSON file
+    writeData(data);
     res.json({ message: `Item at index ${index} deleted`, deletedItem });
   } else {
     res.status(400).json({ error: 'Index out of range' });
   }
 });
 
-const port = process.env.PORT || 3000;
+// Use the router for all routes
+app.use('/.netlify/functions/api', router);
 
-app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
-});
+// Export the server as a serverless function
+module.exports.handler = serverless(app);
+
+// Listen for requests if not running in a serverless environment
+if (!process.env.AWS_LAMBDA_FUNCTION_NAME) {
+  const port = process.env.PORT || 3000;
+  app.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
+  });
+}
